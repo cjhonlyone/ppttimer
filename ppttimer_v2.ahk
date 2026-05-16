@@ -16,19 +16,23 @@ global Config := {
   allMonitorKey: "^#A",
   reloadKey: "^#R",
   ; Appearance
-  opacity: 180,
+  opacity: 255,
   fontface: "Microsoft Yahei",
   fontweight: "bold",
   fontsize: 36,
   indicator_fontsize: 12,
-  textColor: "000000",
-  AheadColor: "9D1000",
-  timeoutColor: "FF0000",
-  backgroundColor: "FFFFAA",
+  textColor: "F5F5F5",
+  AheadColor: "FFB347",
+  timeoutColor: "FF4444",
+  backgroundColor: "010101",
   bannerWidth: 200,
   bannerHeight: 60,
   bannerPosition: "RT",
   bannerMargin: 0,
+  shadowEnabled: true,
+  shadowColor: "2C2C2E",
+  shadowOffsetX: 2,
+  shadowOffsetY: 2,
   ; Timer
   Duration: 300,
   Ahead: 120,
@@ -71,6 +75,7 @@ global State := {
 global UI := {
   Guis: [],
   Texts: [],
+  Shadows: [],
   Indicators: [],
   MainMenu: "",
   ProfilesMenu: "",
@@ -97,13 +102,16 @@ Init() {
   State.MonitorCount := MonitorGetCount()
   UI.Guis := []
   UI.Texts := []
+  UI.Shadows := []
   UI.Indicators := []
 
   Loop State.MonitorCount {
     DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 
     guiObj := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale")
-    durationText := guiObj.AddText("x0 y0 +0x200 Center", "")
+    ; Shadow text must be created first (lower Z-order = rendered behind main text)
+    shadowText := guiObj.AddText("x0 y0 +0x200 Center BackgroundTrans", "")
+    durationText := guiObj.AddText("x0 y0 +0x200 Center BackgroundTrans", "")
     indicatorText := guiObj.AddText("x0 y0 +0x200 BackgroundTrans", "")
 
     guiObj.OnEvent("Close", (*) => ExitApp())
@@ -111,6 +119,7 @@ Init() {
 
     UI.Guis.Push(guiObj)
     UI.Texts.Push(durationText)
+    UI.Shadows.Push(shadowText)
     UI.Indicators.Push(indicatorText)
   }
 
@@ -166,9 +175,16 @@ resetTimer(*) {
   Loop displayCount {
     guiObj := UI.Guis[A_Index]
     textCtrl := UI.Texts[A_Index]
+    shadowCtrl := UI.Shadows[A_Index]
     guiObj.BackColor := Config.backgroundColor
     textCtrl.SetFont("c" Config.textColor)
     textCtrl.Value := initialDisplay
+    if Config.shadowEnabled {
+      shadowCtrl.SetFont("c" Config.shadowColor)
+      shadowCtrl.Value := initialDisplay
+    } else {
+      shadowCtrl.Value := ""
+    }
   }
 
   SetTimer(CountDownTimer, 0)
@@ -189,9 +205,16 @@ startTimer(*) {
   Loop displayCount {
     guiObj := UI.Guis[A_Index]
     textCtrl := UI.Texts[A_Index]
+    shadowCtrl := UI.Shadows[A_Index]
     guiObj.BackColor := Config.backgroundColor
     textCtrl.SetFont("c" Config.textColor)
     textCtrl.Value := initialDisplay
+    if Config.shadowEnabled {
+      shadowCtrl.SetFont("c" Config.shadowColor)
+      shadowCtrl.Value := initialDisplay
+    } else {
+      shadowCtrl.Value := ""
+    }
   }
 
   updateIndicator()
@@ -291,6 +314,7 @@ updateIndicator() {
 updateCountDownText() {
   fg := Config.textColor
   bg := Config.backgroundColor
+  shadowFg := Config.shadowColor
 
   if (Config.CountMode = 0) {
     ; Count-up mode: State.remaining holds elapsed seconds
@@ -301,15 +325,18 @@ updateCountDownText() {
       if State.blink {
         fg := Config.timeoutColor
         bg := Config.backgroundColor
+        shadowFg := "4A0000"
       } else {
         fg := Config.backgroundColor
         bg := Config.timeoutColor
+        shadowFg := Config.shadowColor
       }
     } else {
       warningAt := Config.Duration - Config.Ahead
       if (warningAt > 0 && elapsed >= warningAt) {
         fg := Config.AheadColor
         bg := Config.backgroundColor
+        shadowFg := "4A2C00"
       }
     }
 
@@ -317,9 +344,14 @@ updateCountDownText() {
     Loop displayCount {
       guiObj := UI.Guis[A_Index]
       textCtrl := UI.Texts[A_Index]
+      shadowCtrl := UI.Shadows[A_Index]
       guiObj.BackColor := bg
       textCtrl.SetFont("c" fg)
       textCtrl.Value := FormatSeconds(elapsed)
+      if Config.shadowEnabled {
+        shadowCtrl.SetFont("c" shadowFg)
+        shadowCtrl.Value := FormatSeconds(elapsed)
+      }
     }
   } else {
     ; Countdown mode: State.remaining holds seconds left (negative = overtime)
@@ -328,22 +360,30 @@ updateCountDownText() {
       if (State.blink) {
         fg := Config.timeoutColor
         bg := Config.backgroundColor
+        shadowFg := "4A0000"
       } else {
         fg := Config.backgroundColor
         bg := Config.timeoutColor
+        shadowFg := Config.shadowColor
       }
     } else if (State.remaining <= Config.Ahead) {
       fg := Config.AheadColor
       bg := Config.backgroundColor
+      shadowFg := "4A2C00"
     }
 
     displayCount := Min(State.MonitorCount, UI.Guis.Length, UI.Texts.Length)
     Loop displayCount {
       guiObj := UI.Guis[A_Index]
       textCtrl := UI.Texts[A_Index]
+      shadowCtrl := UI.Shadows[A_Index]
       guiObj.BackColor := bg
       textCtrl.SetFont("c" fg)
       textCtrl.Value := FormatSeconds(State.remaining)
+      if Config.shadowEnabled {
+        shadowCtrl.SetFont("c" shadowFg)
+        shadowCtrl.Value := FormatSeconds(State.remaining)
+      }
     }
   }
 }
@@ -410,22 +450,34 @@ refreshUI() {
 
     guiObj := UI.Guis[A_Index]
     textCtrl := UI.Texts[A_Index]
+    shadowCtrl := UI.Shadows[A_Index]
     indicatorCtrl := UI.Indicators[A_Index]
 
     indicatorCtrl.Move(, indicator_y_scaled, indicator_width_scaled)
     indicatorCtrl.SetFont("s" Round(indicator_fontsize_scaled), "Webdings")
 
-    textCtrl.Move(,, bannerWidth_scaled, bannerHeight_scaled)
+    ; Position shadow text offset from main text, same size
+    shadowOffsetX_scaled := Config.shadowOffsetX * dpi_scale
+    shadowOffsetY_scaled := Config.shadowOffsetY * dpi_scale
+    shadowCtrl.Move(Round(shadowOffsetX_scaled), Round(shadowOffsetY_scaled), bannerWidth_scaled, bannerHeight_scaled)
+    shadowCtrl.SetFont(Config.fontweight " s" Round(fontsize_scaled) " c" Config.shadowColor, Config.fontface)
+    shadowCtrl.Visible := Config.shadowEnabled
+
+    textCtrl.Move(0, 0, bannerWidth_scaled, bannerHeight_scaled)
     textCtrl.SetFont(Config.fontweight " s" Round(fontsize_scaled) " c" Config.textColor, Config.fontface)
 
     if !State.isPptTimerOn {
-      textCtrl.Value := (Config.CountMode = 0) ? FormatSeconds(0) : FormatSeconds(Config.Duration)
+      idleDisplay := (Config.CountMode = 0) ? FormatSeconds(0) : FormatSeconds(Config.Duration)
+      textCtrl.Value := idleDisplay
+      if Config.shadowEnabled {
+        shadowCtrl.Value := idleDisplay
+      }
     }
     guiObj.BackColor := Config.backgroundColor
 
     if (State.showOnAllMonitors || A_Index = State.lastMonitor) {
       guiObj.Show("x" Round(xposition) " y" Round(yposition) " w" Round(bannerWidth_scaled) " h" Round(bannerHeight_scaled) " NA")
-      WinSetTransparent(Round(Config.opacity + 0), "ahk_id " guiObj.Hwnd)
+      WinSetTransColor(Config.backgroundColor, "ahk_id " guiObj.Hwnd)
       WinSetExStyle("+0x20", "ahk_id " guiObj.Hwnd)
     } else {
       guiObj.Hide()
@@ -712,17 +764,23 @@ loadDefaultProfile() {
   Config.fontface := IniRead(Config.IniFile, "Main", "fontface", "Microsoft Yahei")
   Config.fontweight := IniRead(Config.IniFile, "Main", "fontweight", "bold")
   Config.fontsize := IniRead(Config.IniFile, "Main", "fontsize", 36)
-  Config.textColor := IniRead(Config.IniFile, "Main", "textcolor", "000000")
+  Config.textColor := IniRead(Config.IniFile, "Main", "textcolor", "F5F5F5")
 
-  Config.AheadColor := IniRead(Config.IniFile, "Main", "aheadColor", "9D1000")
-  Config.timeoutColor := IniRead(Config.IniFile, "Main", "timeoutColor", "FF0000")
+  Config.AheadColor := IniRead(Config.IniFile, "Main", "aheadColor", "FFB347")
+  Config.timeoutColor := IniRead(Config.IniFile, "Main", "timeoutColor", "FF4444")
 
-  Config.opacity := IniRead(Config.IniFile, "Main", "opacity", 180)
-  Config.backgroundColor := IniRead(Config.IniFile, "Main", "backgroundColor", "FFFFAA")
+  Config.opacity := IniRead(Config.IniFile, "Main", "opacity", 255)
+  Config.backgroundColor := IniRead(Config.IniFile, "Main", "backgroundColor", "010101")
   Config.bannerWidth := IniRead(Config.IniFile, "Main", "width", 200)
   Config.bannerHeight := IniRead(Config.IniFile, "Main", "height", 60)
   Config.bannerPosition := IniRead(Config.IniFile, "Main", "position", "RT")
   Config.bannerMargin := IniRead(Config.IniFile, "Main", "margin", 0)
+
+  shadowEnabledRaw := IniRead(Config.IniFile, "Main", "shadowEnabled", 1)
+  Config.shadowEnabled := (shadowEnabledRaw + 0 != 0)
+  Config.shadowColor := IniRead(Config.IniFile, "Main", "shadowColor", "2C2C2E")
+  Config.shadowOffsetX := validNumberOrDefault(IniRead(Config.IniFile, "Main", "shadowOffsetX", 2), 2)
+  Config.shadowOffsetY := validNumberOrDefault(IniRead(Config.IniFile, "Main", "shadowOffsetY", 2), 2)
 
   Config.Duration := IniRead(Config.IniFile, "Main", "Duration", 300)
   Config.Ahead := IniRead(Config.IniFile, "Main", "Ahead", 120)
