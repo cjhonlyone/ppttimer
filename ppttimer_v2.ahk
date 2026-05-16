@@ -14,6 +14,7 @@ global Config := {
   quitKey: "#ESC",
   moveKey: "^#M",
   allMonitorKey: "^#A",
+  reloadKey: "^#R",
   ; Appearance
   opacity: 180,
   fontface: "Microsoft Yahei",
@@ -447,6 +448,25 @@ toggleCountMode(*) {
   resetTimer()
 }
 
+reloadConfig(*) {
+  ; Disable all current hotkeys before re-registering in case key names changed
+  for keyName in [Config.startKey, Config.stopKey, Config.resetKey, Config.pauseKey,
+                  Config.quitKey, Config.moveKey, Config.allMonitorKey, Config.reloadKey] {
+    try Hotkey(keyName, "Off")
+  }
+  try Hotkey("^#F10", "Off")
+  for _, profileid in State.profiles {
+    try Hotkey("^#F" profileid, "Off")
+  }
+
+  loadSettings()
+  creatMenus()
+
+  if !State.isPptTimerOn {
+    resetTimer()
+  }
+}
+
 moveToNextMonitor(*) {
   if State.showOnAllMonitors {
     return
@@ -536,6 +556,8 @@ creatMenus() {
   }
 
   UI.MainMenu.Add("退出`t" ReadableShortcut(Config.quitKey), quitIt)
+  UI.MainMenu.Add()
+  UI.MainMenu.Add("重新加载配置`t" ReadableShortcut(Config.reloadKey), reloadConfig)
 
   tray := A_TrayMenu
   tray.Delete()
@@ -558,6 +580,8 @@ creatMenus() {
     tray.Add()
   }
   tray.Add("退出`t" ReadableShortcut(Config.quitKey), quitIt)
+  tray.Add()
+  tray.Add("重新加载配置`t" ReadableShortcut(Config.reloadKey), reloadConfig)
 }
 
 loadSettings() {
@@ -574,6 +598,7 @@ loadSettings() {
   Config.quitKey := IniRead(Config.IniFile, "shortcuts", "quitKey", "#ESC")
   Config.moveKey := IniRead(Config.IniFile, "shortcuts", "moveKey", "^#M")
   Config.allMonitorKey := IniRead(Config.IniFile, "shortcuts", "allMonitorKey", "^#A")
+  Config.reloadKey := IniRead(Config.IniFile, "shortcuts", "reloadKey", "^#R")
 
   State.showOnAllMonitors := IniRead(Config.IniFile, "status", "showOnAllMonitors", 0) + 0
   State.lastMonitor := IniRead(Config.IniFile, "status", "lastMonitor", 1) + 0
@@ -590,6 +615,7 @@ loadSettings() {
   Hotkey(Config.quitKey, quitIt)
   Hotkey(Config.moveKey, moveToNextMonitor)
   Hotkey(Config.allMonitorKey, toggleShowOnAllMonitors)
+  Hotkey(Config.reloadKey, reloadConfig)
 
   State.profiles := []
   sectionNames := IniRead(Config.IniFile)
