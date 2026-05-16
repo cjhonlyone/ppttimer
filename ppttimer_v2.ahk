@@ -424,7 +424,7 @@ refreshUI() {
 
     if (State.showOnAllMonitors || A_Index = State.lastMonitor) {
       guiObj.Show("x" Round(xposition) " y" Round(yposition) " w" Round(bannerWidth_scaled) " h" Round(bannerHeight_scaled) " NA")
-      WinSetTransparent(Config.opacity, "ahk_id " guiObj.Hwnd)
+      WinSetTransparent(Round(Config.opacity + 0), "ahk_id " guiObj.Hwnd)
       WinSetExStyle("+0x20", "ahk_id " guiObj.Hwnd)
     } else {
       guiObj.Hide()
