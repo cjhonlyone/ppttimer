@@ -28,7 +28,8 @@ global Config := {
   bannerWidth: 200,
   bannerHeight: 60,
   bannerPosition: "RT",
-  bannerMargin: 0,
+  bannerMarginX: 0,
+  bannerMarginY: 0,
   shadowEnabled: true,
   shadowColor: "2C2C2E",
   shadowOffsetX: 2,
@@ -417,7 +418,8 @@ refreshUI() {
     indicator_fontsize_scaled := Config.indicator_fontsize * dpi_scale
     bannerWidth_scaled := Config.bannerWidth * dpi_scale
     bannerHeight_scaled := Config.bannerHeight * dpi_scale
-    bannerMargin_scaled := Config.bannerMargin * dpi_scale
+    bannerMarginX_scaled := Config.bannerMarginX * dpi_scale
+    bannerMarginY_scaled := Config.bannerMarginY * dpi_scale
     indicator_y_scaled := 2.5 * dpi_scale
     indicator_width_scaled := 40
 
@@ -426,26 +428,26 @@ refreshUI() {
 
     switch Config.bannerPosition {
       case "LT", "TL":
-        xposition := MonitorLeft + bannerMargin_scaled
-        yposition := MonitorTop + bannerMargin_scaled
+        xposition := MonitorLeft + bannerMarginX_scaled
+        yposition := MonitorTop + bannerMarginY_scaled
       case "RT", "TR":
-        xposition := MonitorRight - bannerWidth_scaled - bannerMargin_scaled
-        yposition := MonitorTop + bannerMargin_scaled
+        xposition := MonitorRight - bannerWidth_scaled - bannerMarginX_scaled
+        yposition := MonitorTop + bannerMarginY_scaled
       case "MT", "TM":
         xposition := MonitorLeft + monitorWidth / 2 - bannerWidth_scaled / 2
-        yposition := MonitorTop + bannerMargin_scaled
+        yposition := MonitorTop + bannerMarginY_scaled
       case "LB", "BL":
-        xposition := MonitorLeft + bannerMargin_scaled
-        yposition := MonitorBottom - bannerHeight_scaled - bannerMargin_scaled
+        xposition := MonitorLeft + bannerMarginX_scaled
+        yposition := MonitorBottom - bannerHeight_scaled - bannerMarginY_scaled
       case "MB", "BM":
         xposition := MonitorLeft + monitorWidth / 2 - bannerWidth_scaled / 2
-        yposition := MonitorBottom - bannerHeight_scaled - bannerMargin_scaled
+        yposition := MonitorBottom - bannerHeight_scaled - bannerMarginY_scaled
       case "RB", "BR":
-        xposition := MonitorRight - bannerWidth_scaled - bannerMargin_scaled
-        yposition := MonitorBottom - bannerHeight_scaled - bannerMargin_scaled
+        xposition := MonitorRight - bannerWidth_scaled - bannerMarginX_scaled
+        yposition := MonitorBottom - bannerHeight_scaled - bannerMarginY_scaled
       default:
-        xposition := MonitorRight - bannerWidth_scaled - bannerMargin_scaled
-        yposition := MonitorTop + bannerMargin_scaled
+        xposition := MonitorRight - bannerWidth_scaled - bannerMarginX_scaled
+        yposition := MonitorTop + bannerMarginY_scaled
     }
 
     guiObj := UI.Guis[A_Index]
@@ -704,7 +706,9 @@ loadProfile(idx, *) {
     Config.bannerWidth := IniRead(Config.IniFile, profileSectionName, "width", Config.bannerWidth)
     Config.bannerHeight := IniRead(Config.IniFile, profileSectionName, "height", Config.bannerHeight)
     Config.bannerPosition := IniRead(Config.IniFile, profileSectionName, "position", Config.bannerPosition)
-    Config.bannerMargin := IniRead(Config.IniFile, profileSectionName, "margin", Config.bannerMargin)
+    profileMargin := IniRead(Config.IniFile, profileSectionName, "margin", "")
+    Config.bannerMarginX := IniRead(Config.IniFile, profileSectionName, "marginX", (profileMargin != "") ? profileMargin : Config.bannerMarginX)
+    Config.bannerMarginY := IniRead(Config.IniFile, profileSectionName, "marginY", (profileMargin != "") ? profileMargin : Config.bannerMarginY)
 
     Config.Duration := IniRead(Config.IniFile, profileSectionName, "Duration", Config.Duration)
     Config.Ahead := IniRead(Config.IniFile, profileSectionName, "Ahead", Config.Ahead)
@@ -724,7 +728,8 @@ loadProfile(idx, *) {
   Config.opacity := validNumberOrDefault(Config.opacity, 180)
   Config.bannerWidth := validNumberOrDefault(Config.bannerWidth, 200)
   Config.bannerHeight := validNumberOrDefault(Config.bannerHeight, 60)
-  Config.bannerMargin := validNumberOrDefault(Config.bannerMargin, 0)
+  Config.bannerMarginX := validNumberOrDefault(Config.bannerMarginX, 0)
+  Config.bannerMarginY := validNumberOrDefault(Config.bannerMarginY, 0)
   Config.Duration := validNumberOrDefault(Config.Duration, 1200)
   Config.Ahead := validNumberOrDefault(Config.Ahead, 120)
 
@@ -774,7 +779,9 @@ loadDefaultProfile() {
   Config.bannerWidth := IniRead(Config.IniFile, "Main", "width", 200)
   Config.bannerHeight := IniRead(Config.IniFile, "Main", "height", 60)
   Config.bannerPosition := IniRead(Config.IniFile, "Main", "position", "RT")
-  Config.bannerMargin := IniRead(Config.IniFile, "Main", "margin", 0)
+  defaultMargin := IniRead(Config.IniFile, "Main", "margin", 0)
+  Config.bannerMarginX := IniRead(Config.IniFile, "Main", "marginX", defaultMargin)
+  Config.bannerMarginY := IniRead(Config.IniFile, "Main", "marginY", defaultMargin)
 
   shadowEnabledRaw := IniRead(Config.IniFile, "Main", "shadowEnabled", 1)
   Config.shadowEnabled := (shadowEnabledRaw + 0 != 0)
