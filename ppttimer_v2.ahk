@@ -33,6 +33,7 @@ global Config := {
   Ahead: 120,
   stopResetsTimer: 0,
   sendOnTimeout: "0",
+  CountMode: 1,             ; 0=count-up (正计时), 1=countdown (倒计时)
   manualModeSupressDetection: 1,
   ; Sound
   PlayFinishSound: true,
@@ -157,14 +158,16 @@ resetTimer(*) {
   State.pauseTime := 0
   State.timeoutTriggered := false
   State.currentIndicator := ""
+  State.remaining := (Config.CountMode = 0) ? 0 : Config.Duration
 
+  initialDisplay := (Config.CountMode = 0) ? FormatSeconds(0) : FormatSeconds(Config.Duration)
   displayCount := Min(State.MonitorCount, UI.Guis.Length, UI.Texts.Length)
   Loop displayCount {
     guiObj := UI.Guis[A_Index]
     textCtrl := UI.Texts[A_Index]
     guiObj.BackColor := Config.backgroundColor
     textCtrl.SetFont("c" Config.textColor)
-    textCtrl.Value := FormatSeconds(Config.Duration)
+    textCtrl.Value := initialDisplay
   }
 
   SetTimer(CountDownTimer, 0)
@@ -178,14 +181,16 @@ startTimer(*) {
   State.startTime := A_TickCount
   State.timeoutTriggered := false
   State.currentIndicator := ""
+  State.remaining := (Config.CountMode = 0) ? 0 : Config.Duration
 
+  initialDisplay := (Config.CountMode = 0) ? FormatSeconds(0) : FormatSeconds(Config.Duration)
   displayCount := Min(State.MonitorCount, UI.Guis.Length, UI.Texts.Length)
   Loop displayCount {
     guiObj := UI.Guis[A_Index]
     textCtrl := UI.Texts[A_Index]
     guiObj.BackColor := Config.backgroundColor
     textCtrl.SetFont("c" Config.textColor)
-    textCtrl.Value := FormatSeconds(Config.Duration)
+    textCtrl.Value := initialDisplay
   }
 
   updateIndicator()
@@ -227,15 +232,49 @@ stopTimer(*) {
 
 CountDownTimer() {
   elapsed := (A_TickCount - State.startTime) // 1000
-  newRemaining := Config.Duration - elapsed
-  if (State.remaining != newRemaining) {
-    prevRemaining := State.remaining
-    State.remaining := newRemaining
-    updateCountDownText()
 
-    if (prevRemaining > 0 && State.remaining <= 0 && !State.timeoutTriggered) {
-      State.timeoutTriggered := true
-      sendTimeoutKeys()
+  if (Config.CountMode = 0) {
+    ; Count-up mode (正计时): State.remaining stores elapsed seconds
+    newDisplay := elapsed
+    if (State.remaining != newDisplay) {
+      prevDisplay := State.remaining
+      State.remaining := newDisplay
+      updateCountDownText()
+
+      warningAt := Config.Duration - Config.Ahead
+      if (warningAt > 0 && prevDisplay < warningAt && State.remaining >= warningAt && Config.PlayWarningSound) {
+        PlayWarningSound()
+      }
+      if (prevDisplay < Config.Duration && State.remaining >= Config.Duration) {
+        if Config.PlayFinishSound {
+          PlayFinishSound()
+        }
+        if !State.timeoutTriggered {
+          State.timeoutTriggered := true
+          sendTimeoutKeys()
+        }
+      }
+    }
+  } else {
+    ; Countdown mode (倒计时): State.remaining stores seconds left
+    newRemaining := Config.Duration - elapsed
+    if (State.remaining != newRemaining) {
+      prevRemaining := State.remaining
+      State.remaining := newRemaining
+      updateCountDownText()
+
+      if (prevRemaining > Config.Ahead && State.remaining <= Config.Ahead && Config.PlayWarningSound) {
+        PlayWarningSound()
+      }
+      if (prevRemaining > 0 && State.remaining <= 0) {
+        if Config.PlayFinishSound {
+          PlayFinishSound()
+        }
+        if !State.timeoutTriggered {
+          State.timeoutTriggered := true
+          sendTimeoutKeys()
+        }
+      }
     }
   }
 }
@@ -252,35 +291,59 @@ updateCountDownText() {
   fg := Config.textColor
   bg := Config.backgroundColor
 
-  if (State.remaining < 0) {
-    State.blink := !State.blink
-    if (State.blink) {
-      fg := Config.timeoutColor
-      bg := Config.backgroundColor
+  if (Config.CountMode = 0) {
+    ; Count-up mode: State.remaining holds elapsed seconds
+    elapsed := State.remaining
+    if (elapsed >= Config.Duration) {
+      ; Overtime - blink
+      State.blink := !State.blink
+      if State.blink {
+        fg := Config.timeoutColor
+        bg := Config.backgroundColor
+      } else {
+        fg := Config.backgroundColor
+        bg := Config.timeoutColor
+      }
     } else {
-      fg := Config.backgroundColor
-      bg := Config.timeoutColor
+      warningAt := Config.Duration - Config.Ahead
+      if (warningAt > 0 && elapsed >= warningAt) {
+        fg := Config.AheadColor
+        bg := Config.backgroundColor
+      }
     }
-  } else if (State.remaining <= Config.Ahead) {
-    fg := Config.AheadColor
-    bg := Config.backgroundColor
-  }
 
-  displayCount := Min(State.MonitorCount, UI.Guis.Length, UI.Texts.Length)
-  Loop displayCount {
-    guiObj := UI.Guis[A_Index]
-    textCtrl := UI.Texts[A_Index]
+    displayCount := Min(State.MonitorCount, UI.Guis.Length, UI.Texts.Length)
+    Loop displayCount {
+      guiObj := UI.Guis[A_Index]
+      textCtrl := UI.Texts[A_Index]
+      guiObj.BackColor := bg
+      textCtrl.SetFont("c" fg)
+      textCtrl.Value := FormatSeconds(elapsed)
+    }
+  } else {
+    ; Countdown mode: State.remaining holds seconds left (negative = overtime)
+    if (State.remaining < 0) {
+      State.blink := !State.blink
+      if (State.blink) {
+        fg := Config.timeoutColor
+        bg := Config.backgroundColor
+      } else {
+        fg := Config.backgroundColor
+        bg := Config.timeoutColor
+      }
+    } else if (State.remaining <= Config.Ahead) {
+      fg := Config.AheadColor
+      bg := Config.backgroundColor
+    }
 
-    guiObj.BackColor := bg
-    textCtrl.SetFont("c" fg)
-    textCtrl.Value := FormatSeconds(State.remaining)
-  }
-
-  if (State.remaining = Config.Ahead && Config.PlayWarningSound) {
-    PlayWarningSound()
-  }
-  if (State.remaining = 0 && Config.PlayFinishSound) {
-    PlayFinishSound()
+    displayCount := Min(State.MonitorCount, UI.Guis.Length, UI.Texts.Length)
+    Loop displayCount {
+      guiObj := UI.Guis[A_Index]
+      textCtrl := UI.Texts[A_Index]
+      guiObj.BackColor := bg
+      textCtrl.SetFont("c" fg)
+      textCtrl.Value := FormatSeconds(State.remaining)
+    }
   }
 }
 
@@ -355,7 +418,7 @@ refreshUI() {
     textCtrl.SetFont(Config.fontweight " s" Round(fontsize_scaled) " c" Config.textColor, Config.fontface)
 
     if !State.isPptTimerOn {
-      textCtrl.Value := FormatSeconds(Config.Duration)
+      textCtrl.Value := (Config.CountMode = 0) ? FormatSeconds(0) : FormatSeconds(Config.Duration)
     }
     guiObj.BackColor := Config.backgroundColor
 
@@ -367,6 +430,21 @@ refreshUI() {
       guiObj.Hide()
     }
   }
+}
+
+toggleCountMode(*) {
+  Config.CountMode := (Config.CountMode = 0) ? 1 : 0
+  IniWrite(Config.CountMode, Config.IniFile, "Main", "CountMode")
+
+  if (Config.CountMode = 0) {
+    UI.MainMenu.Check("正计时模式")
+    A_TrayMenu.Check("正计时模式")
+  } else {
+    UI.MainMenu.Uncheck("正计时模式")
+    A_TrayMenu.Uncheck("正计时模式")
+  }
+
+  resetTimer()
 }
 
 moveToNextMonitor(*) {
@@ -415,6 +493,10 @@ creatMenus() {
   UI.MainMenu.Add("停止计时`t" ReadableShortcut(Config.stopKey), stopTimer)
   UI.MainMenu.Add("重置计时`t" ReadableShortcut(Config.resetKey), resetTimer)
   UI.MainMenu.Add("暂停/恢复计时`t" ReadableShortcut(Config.pauseKey), pauseTimer)
+  UI.MainMenu.Add("正计时模式", toggleCountMode)
+  if (Config.CountMode = 0) {
+    UI.MainMenu.Check("正计时模式")
+  }
   UI.MainMenu.Add()
 
   if (State.profiles.Length > 0) {
@@ -461,6 +543,10 @@ creatMenus() {
   tray.Add("停止计时`t" ReadableShortcut(Config.stopKey), stopTimer)
   tray.Add("重置计时`t" ReadableShortcut(Config.resetKey), resetTimer)
   tray.Add("暂停/恢复计时`t" ReadableShortcut(Config.pauseKey), pauseTimer)
+  tray.Add("正计时模式", toggleCountMode)
+  if (Config.CountMode = 0) {
+    tray.Check("正计时模式")
+  }
   tray.Add()
 
   if (State.profiles.Length > 0) {
@@ -624,6 +710,7 @@ loadDefaultProfile() {
   Config.manualModeSupressDetection := IniRead(Config.IniFile, "Main", "manualModeSupressDetection", 1)
   Config.stopResetsTimer := IniRead(Config.IniFile, "Main", "stopResetsTimer", 0)
   Config.sendOnTimeout := IniRead(Config.IniFile, "Main", "sendOnTimeout", 0)
+  Config.CountMode := IniRead(Config.IniFile, "Main", "CountMode", 1) + 0
 }
 
 sendTimeoutKeys() {
