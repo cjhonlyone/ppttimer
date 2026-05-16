@@ -16,7 +16,7 @@ global Config := {
   allMonitorKey: "^#A",
   reloadKey: "^#R",
   ; Appearance
-  opacity: 255,
+  opacity: 210,
   fontface: "Microsoft Yahei",
   fontweight: "bold",
   fontsize: 36,
@@ -24,7 +24,7 @@ global Config := {
   textColor: "F5F5F5",
   AheadColor: "FFB347",
   timeoutColor: "FF4444",
-  backgroundColor: "010101",
+  backgroundColor: "1A1A1A",
   bannerWidth: 200,
   bannerHeight: 60,
   bannerPosition: "RT",
@@ -479,7 +479,7 @@ refreshUI() {
 
     if (State.showOnAllMonitors || A_Index = State.lastMonitor) {
       guiObj.Show("x" Round(xposition) " y" Round(yposition) " w" Round(bannerWidth_scaled) " h" Round(bannerHeight_scaled) " NA")
-      WinSetTransColor(Config.backgroundColor, "ahk_id " guiObj.Hwnd)
+      WinSetTransparent(Round(Config.opacity + 0), "ahk_id " guiObj.Hwnd)
       WinSetExStyle("+0x20", "ahk_id " guiObj.Hwnd)
     } else {
       guiObj.Hide()
@@ -774,8 +774,8 @@ loadDefaultProfile() {
   Config.AheadColor := IniRead(Config.IniFile, "Main", "aheadColor", "FFB347")
   Config.timeoutColor := IniRead(Config.IniFile, "Main", "timeoutColor", "FF4444")
 
-  Config.opacity := IniRead(Config.IniFile, "Main", "opacity", 255)
-  Config.backgroundColor := IniRead(Config.IniFile, "Main", "backgroundColor", "010101")
+  Config.opacity := IniRead(Config.IniFile, "Main", "opacity", 210)
+  Config.backgroundColor := IniRead(Config.IniFile, "Main", "backgroundColor", "1A1A1A")
   Config.bannerWidth := IniRead(Config.IniFile, "Main", "width", 200)
   Config.bannerHeight := IniRead(Config.IniFile, "Main", "height", 60)
   Config.bannerPosition := IniRead(Config.IniFile, "Main", "position", "RT")
